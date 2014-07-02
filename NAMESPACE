@@ -1,0 +1,2 @@
+useDynLib(RcppThreads)
+importFrom(Rcpp, evalCpp)
