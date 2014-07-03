@@ -22,7 +22,7 @@ freely, subject to the following restrictions:
 */
 
 #include <exception>
-#include <tthread/tinythread.h>
+#include "tinythread.h"
 
 #if defined(_TTHREAD_POSIX_)
   #include <unistd.h>
@@ -54,7 +54,7 @@ namespace tthread {
 #endif
 
 #if defined(_TTHREAD_WIN32_)
-condition_variable::condition_variable() : mWaitersCount(0)
+inline condition_variable::condition_variable() : mWaitersCount(0)
 {
   mEvents[_CONDITION_EVENT_ONE] = CreateEvent(NULL, FALSE, FALSE, NULL);
   mEvents[_CONDITION_EVENT_ALL] = CreateEvent(NULL, TRUE, FALSE, NULL);
@@ -63,7 +63,7 @@ condition_variable::condition_variable() : mWaitersCount(0)
 #endif
 
 #if defined(_TTHREAD_WIN32_)
-condition_variable::~condition_variable()
+inline condition_variable::~condition_variable()
 {
   CloseHandle(mEvents[_CONDITION_EVENT_ONE]);
   CloseHandle(mEvents[_CONDITION_EVENT_ALL]);
@@ -72,7 +72,7 @@ condition_variable::~condition_variable()
 #endif
 
 #if defined(_TTHREAD_WIN32_)
-void condition_variable::_wait()
+inline void condition_variable::_wait()
 {
   // Wait for either event to become signaled due to notify_one() or
   // notify_all() being called
@@ -92,7 +92,7 @@ void condition_variable::_wait()
 #endif
 
 #if defined(_TTHREAD_WIN32_)
-void condition_variable::notify_one()
+inline void condition_variable::notify_one()
 {
   // Are there any waiters?
   EnterCriticalSection(&mWaitersCountLock);
@@ -106,7 +106,7 @@ void condition_variable::notify_one()
 #endif
 
 #if defined(_TTHREAD_WIN32_)
-void condition_variable::notify_all()
+inline void condition_variable::notify_all()
 {
   // Are there any waiters?
   EnterCriticalSection(&mWaitersCountLock);
@@ -128,7 +128,7 @@ void condition_variable::notify_all()
 //------------------------------------------------------------------------------
 
 #if defined(_TTHREAD_POSIX_)
-static thread::id _pthread_t_to_ID(const pthread_t &aHandle)
+inline static thread::id _pthread_t_to_ID(const pthread_t &aHandle)
 {
   static mutex idMapLock;
   static std::map<pthread_t, unsigned long int> idMap;
@@ -155,9 +155,9 @@ struct _thread_start_info {
 
 // Thread wrapper function.
 #if defined(_TTHREAD_WIN32_)
-unsigned WINAPI thread::wrapper_function(void * aArg)
+inline unsigned WINAPI thread::wrapper_function(void * aArg)
 #elif defined(_TTHREAD_POSIX_)
-void * thread::wrapper_function(void * aArg)
+inline void * thread::wrapper_function(void * aArg)
 #endif
 {
   // Get thread startup information
@@ -185,7 +185,7 @@ void * thread::wrapper_function(void * aArg)
   return 0;
 }
 
-thread::thread(void (*aFunction)(void *), void * aArg)
+inline thread::thread(void (*aFunction)(void *), void * aArg)
 {
   // Serialize access to this thread structure
   lock_guard<mutex> guard(mDataMutex);
@@ -216,13 +216,13 @@ thread::thread(void (*aFunction)(void *), void * aArg)
   }
 }
 
-thread::~thread()
+inline thread::~thread()
 {
   if(joinable())
     std::terminate();
 }
 
-void thread::join()
+inline void thread::join()
 {
   if(joinable())
   {
@@ -235,7 +235,7 @@ void thread::join()
   }
 }
 
-bool thread::joinable() const
+inline bool thread::joinable() const
 {
   mDataMutex.lock();
   bool result = !mNotAThread;
@@ -243,7 +243,7 @@ bool thread::joinable() const
   return result;
 }
 
-void thread::detach()
+inline void thread::detach()
 {
   mDataMutex.lock();
   if(!mNotAThread)
@@ -258,7 +258,7 @@ void thread::detach()
   mDataMutex.unlock();
 }
 
-thread::id thread::get_id() const
+inline thread::id thread::get_id() const
 {
   if(!joinable())
     return id();
@@ -269,7 +269,7 @@ thread::id thread::get_id() const
 #endif
 }
 
-unsigned thread::hardware_concurrency()
+inline unsigned thread::hardware_concurrency()
 {
 #if defined(_TTHREAD_WIN32_)
   SYSTEM_INFO si;
@@ -291,7 +291,7 @@ unsigned thread::hardware_concurrency()
 // this_thread
 //------------------------------------------------------------------------------
 
-thread::id this_thread::get_id()
+inline thread::id this_thread::get_id()
 {
 #if defined(_TTHREAD_WIN32_)
   return thread::id((unsigned long int) GetCurrentThreadId());
