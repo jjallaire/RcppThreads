@@ -34,6 +34,9 @@ private:
 struct Body {
   virtual ~Body() {} 
   virtual void operator()(const IndexRange& range) const = 0;
+  
+  virtual Body* split(const Body& body) const { return NULL; }
+  virtual void join(const Body& body) {}
 };
 
 
@@ -63,7 +66,32 @@ extern "C" void workerThread(void* data) {
   catch(...)
   {
   }
-}  
+}
+
+// Function to calculate the ranges for a given input
+std::vector<IndexRange> splitInputRange(const IndexRange& range) {
+  
+  // max threads is based on hardware concurrency
+  std::size_t threads = tthread::thread::hardware_concurrency();
+  
+  // determine the chunk size
+  std::size_t length = range.end() - range.begin();
+  std::size_t chunkSize = length / threads;
+  
+  // allocate ranges
+  std::vector<IndexRange> ranges;
+  std::size_t nextIndex = range.begin();
+  for (std::size_t i = 0; i<threads; i++) {
+    std::size_t begin = nextIndex;
+    std::size_t end = std::min(begin + chunkSize, range.end());
+    ranges.push_back(IndexRange(begin, end));
+    nextIndex = end;
+  }
+
+  // return ranges  
+  return ranges;
+}
+
   
 } // anonymous namespace
 
@@ -71,17 +99,54 @@ extern "C" void workerThread(void* data) {
 // Execute the Body over the IndexRange in parallel
 void parallelFor(IndexRange range, const Body& body) {
   
-  // just split into two threads until we write the divider
+  using namespace tthread;
   
-  IndexRange range1(range.begin(), (range.end() - range.begin()) / 2);
-  tthread::thread t1(workerThread, static_cast<void*>(new Work(range1, body)));
+  // split the work
+  std::vector<IndexRange> ranges = splitInputRange(range);
   
-  IndexRange range2(range1.end(), range.end());
-  tthread::thread t2(workerThread, static_cast<void*>(new Work(range2, body)));
+  // create threads
+  std::vector<thread*> threads;
+  for (std::size_t i = 0; i<ranges.size(); ++i) {
+    threads.push_back(new thread(workerThread, new Work(ranges[i], body)));   
+  }
   
-  // wait for all threads to complete
-  t1.join();
-  t2.join();
+  // join and delete them
+  for (std::size_t i = 0; i<threads.size(); ++i) {
+    threads[i]->join();
+    delete threads[i];
+  }
+}
+
+// Execute the Body over the IndexRange in parallel then join results
+void parallelReduce(IndexRange range, Body& body) {
+  
+  using namespace tthread;
+  
+  // split the work
+  std::vector<IndexRange> ranges = splitInputRange(range);
+  
+  // create threads (split for each thread and track the allocated bodies)
+  std::vector<thread*> threads;
+  std::vector<Body*> bodies;
+  for (std::size_t i = 0; i<ranges.size(); ++i) {
+    Body* pBody = body.split(body);
+    bodies.push_back(pBody);
+    threads.push_back(new thread(workerThread, new Work(ranges[i], *pBody)));   
+  }
+  
+  // wait for each thread, join it's results, then delete the body & thread
+  for (std::size_t i = 0; i<threads.size(); ++i) {
+    
+    // wait for thread
+    threads[i]->join();
+    
+    // join the results
+    body.join(*bodies[i]);
+    
+    // delete the body (which we split above) and the thread
+    delete bodies[i];
+    delete threads[i];
+  }
 }
 
 
