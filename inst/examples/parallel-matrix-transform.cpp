@@ -91,7 +91,7 @@ NumericMatrix parallelMatrixSqrt(NumericMatrix x) {
 
 /**
  * A comparison of the performance of the two functions shows the parallel 
- * version performing about 2.5 times as fast on a machine with 4 cores:
+ * version performing about 2.25 times as fast on a machine with 4 cores:
  */
 
 /*** R

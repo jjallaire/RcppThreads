@@ -98,7 +98,7 @@ double parallelVectorSum(NumericVector x) {
 
 /**
  * A comparison of the performance of the two functions shows the parallel
- * version performing about 4 times as fast on a machine with 4 cores:
+ * version performing about 3 times as fast on a machine with 4 cores:
  */
 
 /*** R
