@@ -8,6 +8,19 @@
 
 namespace RcppThreads {
 
+// Body of code to execute within a worker thread
+struct Body {
+  virtual ~Body() {} 
+  
+  virtual void operator()(std::size_t begin, std::size_t end) = 0;
+  
+  virtual Body* split(const Body& body) const { return NULL; }
+  virtual void join(const Body& body) {}
+};
+
+
+namespace {
+
 // Class which represents a range of indexes to perform work on
 // (worker functions are passed this range so they know which
 // elements are safe to read/write to)
@@ -30,18 +43,6 @@ private:
 };
 
 
-// Body of code to execute within a worker thread
-struct Body {
-  virtual ~Body() {} 
-  virtual void operator()(const IndexRange& range) = 0;
-  
-  virtual Body* split(const Body& body) const { return NULL; }
-  virtual void join(const Body& body) {}
-};
-
-
-namespace {
-
 // Because tinythread allows us to pass only a plain C function
 // we need to pass our body and range within a struct that we 
 // can cast to/from void*
@@ -60,7 +61,7 @@ extern "C" void workerThread(void* data) {
   try
   {
     Work* pWork = static_cast<Work*>(data);
-    pWork->body(pWork->range);
+    pWork->body(pWork->range.begin(), pWork->range.end());
     delete pWork;
   }
   catch(...)
@@ -92,17 +93,15 @@ std::vector<IndexRange> splitInputRange(const IndexRange& range) {
   return ranges;
 }
 
-  
 } // anonymous namespace
 
-
 // Execute the Body over the IndexRange in parallel
-void parallelFor(IndexRange range, Body& body) {
+void parallelFor(std::size_t begin, std::size_t end, Body& body) {
   
   using namespace tthread;
   
   // split the work
-  std::vector<IndexRange> ranges = splitInputRange(range);
+  std::vector<IndexRange> ranges = splitInputRange(IndexRange(begin, end));
   
   // create threads
   std::vector<thread*> threads;
@@ -118,12 +117,12 @@ void parallelFor(IndexRange range, Body& body) {
 }
 
 // Execute the Body over the IndexRange in parallel then join results
-void parallelReduce(IndexRange range, Body& body) {
+void parallelReduce(std::size_t begin, std::size_t end, Body& body) {
   
   using namespace tthread;
   
   // split the work
-  std::vector<IndexRange> ranges = splitInputRange(range);
+  std::vector<IndexRange> ranges = splitInputRange(IndexRange(begin, end));
   
   // create threads (split for each thread and track the allocated bodies)
   std::vector<thread*> threads;
@@ -148,8 +147,6 @@ void parallelReduce(IndexRange range, Body& body) {
     delete threads[i];
   }
 }
-
-
 
 } // namespace RcppThreads
 

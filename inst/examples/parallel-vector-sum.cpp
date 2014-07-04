@@ -69,8 +69,8 @@ struct SumBody : public Body
    }
    
    // accumulate just the element of the range I've been asked to
-   void operator()(const IndexRange& range) {
-      sum += std::accumulate(input + range.begin(), input + range.end(), 0.0);
+   void operator()(std::size_t begin, std::size_t end) {
+      sum += std::accumulate(input + begin, input + end, 0.0);
    }
    
    // join my sum with another one
@@ -90,7 +90,7 @@ double parallelVectorSum(NumericVector x) {
    SumBody sumBody(x.begin());
    
    // call parallel_reduce to start the work
-   parallelReduce(IndexRange(0, x.length()), sumBody);
+   parallelReduce(0, x.length(), sumBody);
    
    // return the computed sum
    return sumBody.sum;
