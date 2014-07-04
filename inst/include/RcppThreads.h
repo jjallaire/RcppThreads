@@ -20,14 +20,6 @@ public:
   {
   }
   
-  // Initialize with a type that has a length() member 
-  // (begin is always 0 for this constructor)
-  template <typename Indexable>
-  IndexRange(const Indexable& indexable) 
-    : begin_(0), end_(indexable.length())
-  {
-  }
-  
   // Access begin() and end()
   std::size_t begin() const { return begin_; }
   std::size_t end() const { return end_; }
@@ -39,8 +31,7 @@ private:
 
 
 // Body of code to execute within a worker thread
-class Body {
-public:
+struct Body {
   virtual ~Body() {} 
   virtual void operator()(const IndexRange& range) const = 0;
 };
