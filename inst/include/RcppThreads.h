@@ -33,7 +33,7 @@ private:
 // Body of code to execute within a worker thread
 struct Body {
   virtual ~Body() {} 
-  virtual void operator()(const IndexRange& range) const = 0;
+  virtual void operator()(const IndexRange& range) = 0;
   
   virtual Body* split(const Body& body) const { return NULL; }
   virtual void join(const Body& body) {}
@@ -46,12 +46,12 @@ namespace {
 // we need to pass our body and range within a struct that we 
 // can cast to/from void*
 struct Work {
-  Work(IndexRange range, const Body& body) 
+  Work(IndexRange range, Body& body) 
     :  range(range), body(body)
   {
   }
   IndexRange range;
-  const Body& body;
+  Body& body;
 };
 
 // Thread which performs work (then deletes the work object
@@ -97,7 +97,7 @@ std::vector<IndexRange> splitInputRange(const IndexRange& range) {
 
 
 // Execute the Body over the IndexRange in parallel
-void parallelFor(IndexRange range, const Body& body) {
+void parallelFor(IndexRange range, Body& body) {
   
   using namespace tthread;
   

@@ -61,7 +61,7 @@ struct SqrtBody : public Body
       : input(input), output(output) {}
    
    // take the square root of the range of elements requested
-   void operator()(const IndexRange& range) const {
+   void operator()(const IndexRange& range) {
       std::transform(input + range.begin(),
                      input + range.end(),
                      output + range.begin(),
@@ -82,8 +82,9 @@ NumericMatrix parallelMatrixSqrt(NumericMatrix x) {
   
   NumericMatrix output(x.nrow(), x.ncol());
   
-  parallelFor(IndexRange(0, x.length()), 
-              SqrtBody(x.begin(), output.begin()));
+  SqrtBody body(x.begin(), output.begin());
+  
+  parallelFor(IndexRange(0, x.length()), body);
   
   return output;
 }
