@@ -71,10 +71,17 @@ extern "C" void workerThread(void* data) {
 // Execute the Body over the IndexRange in parallel
 void parallelFor(IndexRange range, const Body& body) {
   
-  // for now we have a simple serial implementation...
+  // just split into two threads until we write the divider
   
-  tthread::thread t(workerThread, static_cast<void*>(new Work(range, body)));
-  t.join();
+  IndexRange range1(range.begin(), (range.end() - range.begin()) / 2);
+  tthread::thread t1(workerThread, static_cast<void*>(new Work(range1, body)));
+  
+  IndexRange range2(range1.end(), range.end());
+  tthread::thread t2(workerThread, static_cast<void*>(new Work(range2, body)));
+  
+  // wait for all threads to complete
+  t1.join();
+  t2.join();
 }
 
 
