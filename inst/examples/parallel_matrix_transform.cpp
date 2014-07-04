@@ -9,8 +9,8 @@
 
 /**
  * First a serial version of the matrix transformation. We take the square root 
- * of each item of a matrix and return a new matrix with the tranformed values.
- * We do this by using `std::transform` to call the `sqrt` function on each
+ * of each item of a matrix and return a new matrix with the tranformed values. 
+ * We do this by using `std::transform` to call the `sqrt` function on each 
  * element of the matrix:
  */
 
@@ -34,14 +34,14 @@ NumericMatrix matrixSqrt(NumericMatrix orig) {
 
 /**
  * Now we adapt our code to run in parallel using RcppThreads. We'll use the 
- * `parallelFor` function to do this. RcppThreads takes care of 
- * dividing up work between threads, our job is to implement a "Body"
- * functor that performs the work over a given range of our input.
+ * `parallelFor` function to do this. RcppThreads takes care of dividing up work
+ * between threads, our job is to implement a "Body" functor that performs the
+ * work over a given range of our input.
  * 
- * The `SqrtBody` functor below includes pointers to the input matrix as 
- * well as the output matrix. Within it's `operator()` method it 
- * performs a `std::transform` with the `sqrt` function on the array
- * elements specified by the `range` argument:
+ * The `SqrtBody` functor below includes pointers to the input matrix as well as
+ * the output matrix. Within it's `operator()` method it performs a
+ * `std::transform` with the `sqrt` function on the array elements specified by
+ * the `range` argument:
  */
 
 // [[Rcpp::depends(RcppThreads)]]
@@ -70,11 +70,11 @@ struct SqrtBody : public Body
 };
 
 /**
- * Here's the parallel version of our matrix transformation function that
- * makes uses of the `SqrtBody` functor. The main difference is that 
- * rather than calling `std::transform` directly, the `parallelFor`
- * function is called with the range to operate on (based on the length
- * of the input matrix) and an instance of `SqrtBody`:
+ * Here's the parallel version of our matrix transformation function that makes
+ * uses of the `SqrtBody` functor. The main difference is that rather than
+ * calling `std::transform` directly, the `parallelFor` function is called with
+ * the range to operate on (based on the length of the input matrix) and an
+ * instance of `SqrtBody`:
  */
 
 // [[Rcpp::export]]
@@ -89,7 +89,7 @@ NumericMatrix parallelMatrixSqrt(NumericMatrix x) {
 }
 
 /**
- * A comparison of the performance of the two functions shows the parallel
+ * A comparison of the performance of the two functions shows the parallel 
  * version performing about 2.5 times as fast on a machine with 4 cores:
  */
 
