@@ -94,7 +94,7 @@ double parallelVectorSum(NumericVector x) {
    // declare the Sum instance that takes a pointer to the vector data
    Sum sum(x.begin());
    
-   // call parallel_reduce to start the work
+   // call parallelReduce to do the work
    parallelReduce(0, x.length(), sum);
    
    // return the computed sum

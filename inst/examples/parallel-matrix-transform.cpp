@@ -78,12 +78,16 @@ struct SquareRoot : public Body<SquareRoot>
 // [[Rcpp::export]]
 NumericMatrix parallelMatrixSqrt(NumericMatrix x) {
   
+  // allocate the output matrix
   NumericMatrix output(x.nrow(), x.ncol());
   
+  // SquareRoot instance that takes a pointer to the input & output data
   SquareRoot squareRoot(x.begin(), output.begin());
   
+  // call parallelFor to do the work
   parallelFor(0, x.length(), squareRoot);
   
+  // return the output matrix
   return output;
 }
 
