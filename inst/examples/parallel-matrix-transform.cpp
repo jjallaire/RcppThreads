@@ -48,16 +48,17 @@ NumericMatrix matrixSqrt(NumericMatrix orig) {
 #include <RcppThreads.h>
 using namespace RcppThreads;
 
-struct SqrtBody : public Body
+struct SquareRoot : public Body<SquareRoot>
 {
    // source matrix
-   double * const input;
+   double* input;
    
    // destination matrix
    double* output;
    
    // initialize with source and destination
-   SqrtBody(double * const input, double* output) 
+   SquareRoot() : input(NULL), output(NULL) {}
+   SquareRoot(double* input, double* output) 
       : input(input), output(output) {}
    
    // take the square root of the range of elements requested
@@ -79,9 +80,9 @@ NumericMatrix parallelMatrixSqrt(NumericMatrix x) {
   
   NumericMatrix output(x.nrow(), x.ncol());
   
-  SqrtBody body(x.begin(), output.begin());
+  SquareRoot squareRoot(x.begin(), output.begin());
   
-  parallelFor(0, x.length(), body);
+  parallelFor(0, x.length(), squareRoot);
   
   return output;
 }

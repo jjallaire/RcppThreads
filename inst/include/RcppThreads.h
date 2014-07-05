@@ -8,14 +8,38 @@
 
 namespace RcppThreads {
 
-// Body of code to execute within a worker thread
-struct Body {
-  virtual ~Body() {} 
+// Body of code to execute within a worker thread. We declare this 
+// non-templetized base class so we can can have a stable type to
+// cast the void* to within the worker thread -- the Body<T> class
+// extends IBody with correct type info.
+struct IBody {
+  virtual ~IBody() {}
+  virtual void operator()(std::size_t begin, std::size_t end) = 0;
+  virtual IBody* doSplit(const IBody& body) const = 0;
+  virtual void doJoin(const IBody& rhs) = 0;
+};
+
+template <typename T> 
+struct Body : public IBody {
   
+  // all bodies implement operator() to perform work
   virtual void operator()(std::size_t begin, std::size_t end) = 0;
   
-  virtual Body* split(const Body& body) const { return NULL; }
-  virtual void join(const Body& body) {}
+  // optional split and join methods for parallelReduce
+  virtual void split(const T& body) {}
+  virtual void join(const T& rhs) {}
+  
+  // implement doSplit and doJoin (keep the required allocation and 
+  // downcast in this base class so the child can have a more TBB
+  // compatible interface and not have to allocate and downcast)
+  IBody* doSplit(const IBody& body) const {
+    T* t = new T();
+    t->split(static_cast<const T&>(body));
+    return t;
+  }
+  void doJoin(const IBody& rhs) {
+    join(static_cast<const T&>(rhs));
+  }
 };
 
 
@@ -47,12 +71,12 @@ private:
 // we need to pass our body and range within a struct that we 
 // can cast to/from void*
 struct Work {
-  Work(IndexRange range, Body& body) 
+  Work(IndexRange range, IBody& body) 
     :  range(range), body(body)
   {
   }
   IndexRange range;
-  Body& body;
+  IBody& body;
 };
 
 // Thread which performs work (then deletes the work object
@@ -95,8 +119,8 @@ std::vector<IndexRange> splitInputRange(const IndexRange& range) {
 
 } // anonymous namespace
 
-// Execute the Body over the IndexRange in parallel
-void parallelFor(std::size_t begin, std::size_t end, Body& body) {
+// Execute the IBody over the IndexRange in parallel
+void parallelFor(std::size_t begin, std::size_t end, IBody& body) {
   
   using namespace tthread;
   
@@ -116,8 +140,8 @@ void parallelFor(std::size_t begin, std::size_t end, Body& body) {
   }
 }
 
-// Execute the Body over the IndexRange in parallel then join results
-void parallelReduce(std::size_t begin, std::size_t end, Body& body) {
+// Execute the IBody over the IndexRange in parallel then join results
+void parallelReduce(std::size_t begin, std::size_t end, IBody& body) {
   
   using namespace tthread;
   
@@ -126,9 +150,9 @@ void parallelReduce(std::size_t begin, std::size_t end, Body& body) {
   
   // create threads (split for each thread and track the allocated bodies)
   std::vector<thread*> threads;
-  std::vector<Body*> bodies;
+  std::vector<IBody*> bodies;
   for (std::size_t i = 0; i<ranges.size(); ++i) {
-    Body* pBody = body.split(body);
+    IBody* pBody = body.doSplit(body);
     bodies.push_back(pBody);
     threads.push_back(new thread(workerThread, new Work(ranges[i], *pBody)));   
   }
@@ -140,7 +164,7 @@ void parallelReduce(std::size_t begin, std::size_t end, Body& body) {
     threads[i]->join();
     
     // join the results
-    body.join(*bodies[i]);
+    body.doJoin(*bodies[i]);
     
     // delete the body (which we split above) and the thread
     delete bodies[i];

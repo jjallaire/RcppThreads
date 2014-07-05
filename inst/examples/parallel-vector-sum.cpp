@@ -53,28 +53,33 @@ double vectorSum(NumericVector x) {
 #include <RcppThreads.h>
 using namespace RcppThreads;
 
-struct SumBody : public Body 
+struct Sum : public Body<Sum>
 {   
    // source vector
-   double * const input;
+   double * input;
    
-   // sum that I have accumulated
-   double sum;
+   // value that I have accumulated
+   double value;
    
-   // standard and splitting constructor  
-   SumBody(double * const input) : input(input), sum(0) {}
-   
-   Body* split(const Body& body) const {
-     return new SumBody(((SumBody&)body).input);
-   }
+   // constructors
+   Sum() : input(NULL), value(0) {}
+   Sum(double* input) : input(input), value(0) {}
    
    // accumulate just the element of the range I've been asked to
    void operator()(std::size_t begin, std::size_t end) {
-      sum += std::accumulate(input + begin, input + end, 0.0);
+      value += std::accumulate(input + begin, input + end, 0.0);
    }
    
-   // join my sum with another one
-   void join(const Body& rhs) { sum += ((SumBody&)rhs).sum; }
+   // split me from another Sum
+   void split(const Sum& body) {
+     input = body.input;
+     value = 0;
+   }
+    
+   // join my value with that of another Sum
+   void join(const Sum& rhs) { 
+     value += rhs.value; 
+   }
 };
 
 /**
@@ -86,14 +91,14 @@ struct SumBody : public Body
 // [[Rcpp::export]]
 double parallelVectorSum(NumericVector x) {
    
-   // declare the SumBody instance that takes a pointer to the vector data
-   SumBody sumBody(x.begin());
+   // declare the Sum instance that takes a pointer to the vector data
+   Sum sum(x.begin());
    
    // call parallel_reduce to start the work
-   parallelReduce(0, x.length(), sumBody);
+   parallelReduce(0, x.length(), sum);
    
    // return the computed sum
-   return sumBody.sum;
+   return sum.value;
 }
 
 /**
