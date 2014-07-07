@@ -6,6 +6,8 @@
 #include "tthread/tinythread.h"
 #include "tthread/tinythread.inl"
 
+#include <vector>
+
 namespace RcppThreads {
 
 // Body of code to execute within a worker thread. We declare this 
@@ -81,7 +83,7 @@ struct Work {
 
 // Thread which performs work (then deletes the work object
 // when it's done)
-extern "C" void workerThread(void* data) {
+extern "C" inline void workerThread(void* data) {
   try
   {
     Work* pWork = static_cast<Work*>(data);
@@ -120,7 +122,7 @@ std::vector<IndexRange> splitInputRange(const IndexRange& range) {
 } // anonymous namespace
 
 // Execute the IBody over the IndexRange in parallel
-void parallelFor(std::size_t begin, std::size_t end, IBody& body) {
+inline void parallelFor(std::size_t begin, std::size_t end, IBody& body) {
   
   using namespace tthread;
   
@@ -141,7 +143,7 @@ void parallelFor(std::size_t begin, std::size_t end, IBody& body) {
 }
 
 // Execute the IBody over the IndexRange in parallel then join results
-void parallelReduce(std::size_t begin, std::size_t end, IBody& body) {
+inline void parallelReduce(std::size_t begin, std::size_t end, IBody& body) {
   
   using namespace tthread;
   
