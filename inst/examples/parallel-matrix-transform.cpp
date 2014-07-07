@@ -48,7 +48,7 @@ NumericMatrix matrixSqrt(NumericMatrix orig) {
 #include <RcppThreads.h>
 using namespace RcppThreads;
 
-struct SquareRoot : public Body<SquareRoot>
+struct SquareRoot : public IWorker
 {
    // source matrix
    double* input;

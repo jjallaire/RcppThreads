@@ -10,38 +10,19 @@
 
 namespace RcppThreads {
 
-// Body of code to execute within a worker thread. We declare this 
-// non-templetized base class so we can can have a stable type to
-// cast the void* to within the worker thread -- the Body<T> class
-// extends IBody with correct type info.
-struct IBody {
-  virtual ~IBody() {}
+// Code which can be executed within a worker thread. We implement
+// dynamic dispatch using vtables so we can have a stable type to
+// cast the void* to within the worker thread.
+
+struct IWorker {
+  virtual ~IWorker() {}
   virtual void operator()(std::size_t begin, std::size_t end) = 0;
-  virtual IBody* doSplit(const IBody& body) const = 0;
-  virtual void doJoin(const IBody& rhs) = 0;
 };
 
 template <typename T> 
-struct Body : public IBody {
-  
-  // all bodies implement operator() to perform work
-  virtual void operator()(std::size_t begin, std::size_t end) = 0;
-  
-  // optional split and join methods for parallelReduce
-  virtual void split(const T& body) {}
-  virtual void join(const T& rhs) {}
-  
-  // implement doSplit and doJoin (keep the required allocation and 
-  // downcast in this base class so the child can have a more TBB
-  // compatible interface and not have to allocate and downcast)
-  IBody* doSplit(const IBody& body) const {
-    T* t = new T();
-    t->split(static_cast<const T&>(body));
-    return t;
-  }
-  void doJoin(const IBody& rhs) {
-    join(static_cast<const T&>(rhs));
-  }
+struct Reduce : public IWorker {
+  virtual void split(const T& source) = 0;
+  virtual void join(const T& rhs) = 0;
 };
 
 
@@ -70,15 +51,15 @@ private:
 
 
 // Because tinythread allows us to pass only a plain C function
-// we need to pass our body and range within a struct that we 
+// we need to pass our worker and range within a struct that we 
 // can cast to/from void*
 struct Work {
-  Work(IndexRange range, IBody& body) 
-    :  range(range), body(body)
+  Work(IndexRange range, IWorker& worker) 
+    :  range(range), worker(worker)
   {
   }
   IndexRange range;
-  IBody& body;
+  IWorker& worker;
 };
 
 // Thread which performs work (then deletes the work object
@@ -87,7 +68,7 @@ extern "C" inline void workerThread(void* data) {
   try
   {
     Work* pWork = static_cast<Work*>(data);
-    pWork->body(pWork->range.begin(), pWork->range.end());
+    pWork->worker(pWork->range.begin(), pWork->range.end());
     delete pWork;
   }
   catch(...)
@@ -121,8 +102,8 @@ std::vector<IndexRange> splitInputRange(const IndexRange& range) {
 
 } // anonymous namespace
 
-// Execute the IBody over the IndexRange in parallel
-inline void parallelFor(std::size_t begin, std::size_t end, IBody& body) {
+// Execute the IWorker over the IndexRange in parallel
+inline void parallelFor(std::size_t begin, std::size_t end, IWorker& worker) {
   
   using namespace tthread;
   
@@ -132,7 +113,7 @@ inline void parallelFor(std::size_t begin, std::size_t end, IBody& body) {
   // create threads
   std::vector<thread*> threads;
   for (std::size_t i = 0; i<ranges.size(); ++i) {
-    threads.push_back(new thread(workerThread, new Work(ranges[i], body)));   
+    threads.push_back(new thread(workerThread, new Work(ranges[i], worker)));   
   }
   
   // join and delete them
@@ -142,34 +123,36 @@ inline void parallelFor(std::size_t begin, std::size_t end, IBody& body) {
   }
 }
 
-// Execute the IBody over the IndexRange in parallel then join results
-inline void parallelReduce(std::size_t begin, std::size_t end, IBody& body) {
+// Execute the IWorker over the IndexRange in parallel then join results
+template <typename T>
+inline void parallelReduce(std::size_t begin, std::size_t end, Reduce<T>& worker) {
   
   using namespace tthread;
   
   // split the work
   std::vector<IndexRange> ranges = splitInputRange(IndexRange(begin, end));
   
-  // create threads (split for each thread and track the allocated bodies)
+  // create threads (split for each thread and track the allocated workers)
   std::vector<thread*> threads;
-  std::vector<IBody*> bodies;
+  std::vector<Reduce<T>*> workers;
   for (std::size_t i = 0; i<ranges.size(); ++i) {
-    IBody* pBody = body.doSplit(body);
-    bodies.push_back(pBody);
-    threads.push_back(new thread(workerThread, new Work(ranges[i], *pBody)));   
+    T* pWorker = new T();
+    pWorker->split(static_cast<T&>(worker));
+    workers.push_back(pWorker);
+    threads.push_back(new thread(workerThread, new Work(ranges[i], *pWorker)));  
   }
   
-  // wait for each thread, join it's results, then delete the body & thread
+  // wait for each thread, join it's results, then delete the worker & thread
   for (std::size_t i = 0; i<threads.size(); ++i) {
     
     // wait for thread
     threads[i]->join();
-    
+   
     // join the results
-    body.doJoin(*bodies[i]);
+    worker.join(static_cast<T&>(*workers[i]));
     
-    // delete the body (which we split above) and the thread
-    delete bodies[i];
+    // delete the worker (which we split above) and the thread
+    delete workers[i];
     delete threads[i];
   }
 }

@@ -53,7 +53,7 @@ double vectorSum(NumericVector x) {
 #include <RcppThreads.h>
 using namespace RcppThreads;
 
-struct Sum : public Body<Sum>
+struct Sum : public Reduce<Sum>
 {   
    // source vector
    double * input;
@@ -71,8 +71,8 @@ struct Sum : public Body<Sum>
    }
    
    // split me from another Sum
-   void split(const Sum& body) {
-     input = body.input;
+   void split(const Sum& source) {
+     input = source.input;
      value = 0;
    }
     
